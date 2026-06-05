@@ -1,115 +1,128 @@
+# =========================================================================
+# 06_boxplots.R
+# Purpose:  Outlier detection, skewness visualization, and log transformation
+#           of MT. Distribution plots for TP, ER, and r.
+# Input:    long_data (from 02_descriptives.R)
+# Output:   Figures B.3, B.4, B.5, Figure 7 (TP distribution)
+# Note:     long_data is overwritten at the end with log10(MT)
+# =========================================================================
+
 library(tidyverse)
 
-# --- Boxplots: Identifying Skewness and Outliers (Normal Scale) ---
-ggplot(long_data %>% filter(Metric == "Movement Time (ms)"), 
+# -------------------------------------------------------------------------
+# 1. SHARED THEME
+# -------------------------------------------------------------------------
+
+boxplot_theme <- theme_minimal() +
+  theme(
+    strip.text       = element_text(face = "bold", size = 11),
+    strip.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border     = element_rect(color = "grey80", fill = NA, linewidth = 0.5),
+    plot.title       = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle    = element_text(size = 10, hjust = 0.5, color = "grey40"),
+    axis.title       = element_text(size = 10),
+    legend.position  = "none"
+  )
+
+# -------------------------------------------------------------------------
+# 2. FIGURE B.3 — Skewness and Outlier Detection in MT (original scale)
+# -------------------------------------------------------------------------
+
+ggplot(long_data %>% filter(Metric == "Movement Time (ms)"),
        aes(x = as.factor(Dia), y = Value, fill = Condicion)) +
   geom_boxplot(outlier.color = "red", outlier.shape = 16) +
-  # Facet_wrap with free scales to better visualize each Condition
-  facet_wrap(~Condicion, scales = "free_y") +
-  labs(title = "Skewness and Outlier Detection in MTavg",
-       subtitle = "Red dots represent statistical outliers",
-       x = "Session (Day)",
-       y = "Movement Time (ms)",
-       fill = "Condition") +
-  theme_minimal()
+  facet_wrap(~ Condicion, scales = "free_y") +
+  labs(
+    title    = "Skewness and Outlier Detection in MT\u2090\u1D65\u1D4D",
+    subtitle = "Red dots represent statistical outliers",
+    x        = "Session (Day)",
+    y        = "Movement Time (ms)"
+  ) +
+  boxplot_theme
 
-# --- Boxplots: Identifying Skewness and Outliers for Throughput (TP) ---
-ggplot(long_data %>% filter(Metric == "Throughput (bps)"), 
+# -------------------------------------------------------------------------
+# 3. FIGURE 10 — Skewness and Outlier Detection in TP
+# -------------------------------------------------------------------------
+
+ggplot(long_data %>% filter(Metric == "Throughput (bps)"),
        aes(x = as.factor(Dia), y = Value, fill = Condicion)) +
   geom_boxplot(outlier.color = "red", outlier.shape = 16) +
-  # Facet_wrap para ver cada condición por separado con su propia escala
-  facet_wrap(~Condicion, scales = "free_y") +
-  labs(title = "Skewness and Outlier Detection in Throughput (TP)",
-       subtitle = "Red dots represent statistical outliers",
-       x = "Session (Day)",
-       y = "Throughput (bps)",
-       fill = "Condition") +
-  theme_minimal()
+  facet_wrap(~ Condicion, scales = "free_y") +
+  labs(
+    title    = "Skewness and Outlier Detection in Throughput (TP)",
+    subtitle = "Red dots represent statistical outliers",
+    x        = "Session (Day)",
+    y        = "Throughput (bps)"
+  ) +
+  boxplot_theme
 
+# -------------------------------------------------------------------------
+# 4. FIGURE B.4 — Effect of Log Transformation on MT (distribution comparison)
+# -------------------------------------------------------------------------
 
-# --- Boxplots: Logarithmic Scale (Log10) ---
-# Note: Log transformation is often used to normalize positively skewed reaction time data.
-ggplot(long_data %>% filter(Metric == "Movement Time (ms)"), 
-       aes(x = as.factor(Dia), y = Value, fill = Condicion)) +
-  geom_boxplot(outlier.color = "red", outlier.shape = 16) +
-  # Applying log10 scale to the Y-axis
-  scale_y_log10() + 
-  facet_wrap(~Condicion, scales = "free_y") +
-  labs(title = "Boxplots in Logarithmic Scale (Log10)",
-       subtitle = "Transformation applied across all conditions to improve comparability",
-       x = "Session (Day)",
-       y = "log10(MTavg)",
-       fill = "Condition") +
-  theme_minimal()
-
-# --- Distribution Comparison: Original vs. Log-Transformed ---
-# 1. Create a temporary dataset for comparison
 comparison_orig <- long_data %>%
   filter(Metric == "Movement Time (ms)") %>%
   mutate(Transformation = "Original (ms)")
 
 comparison_log <- comparison_orig %>%
-  mutate(Value = log10(Value),
+  mutate(Value          = log10(Value),
          Transformation = "Log-Transformed (log10)")
 
-# 2. Merge, set factor levels for ordering, and Plot
 bind_rows(comparison_orig, comparison_log) %>%
-  # Forzamos el orden: primero Original, luego Log
-  mutate(Transformation = factor(Transformation, 
+  mutate(Transformation = factor(Transformation,
                                  levels = c("Original (ms)", "Log-Transformed (log10)"))) %>%
   ggplot(aes(x = Value, fill = Transformation)) +
-  geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = 0.5, color = "white") +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, alpha = 0.5, color = "white") +
   geom_density(linewidth = 1) +
-  facet_wrap(~Transformation, scales = "free") +
-  labs(title = "Effect of Logarithmic Transformation on MTavg",
-       subtitle = "Log scale reduces positive skewness and helps normalize residuals",
-       x = "Value", 
-       y = "Density") +
-  theme_minimal() +
-  theme(legend.position = "none")
+  facet_wrap(~ Transformation, scales = "free") +
+  labs(
+    title    = "Effect of Logarithmic Transformation on MT\u2090\u1D65\u1D4D",
+    subtitle = "Log scale reduces positive skewness and helps normalize residuals",
+    x        = "Value",
+    y        = "Density"
+  ) +
+  boxplot_theme
 
-# Sobrescribimos la columna original con su versión logarítmica
+# -------------------------------------------------------------------------
+# 5. FIGURE B.5 — MT Boxplots in Logarithmic Scale
+# -------------------------------------------------------------------------
+
+ggplot(long_data %>% filter(Metric == "Movement Time (ms)"),
+       aes(x = as.factor(Dia), y = Value, fill = Condicion)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16) +
+  scale_y_log10() +
+  facet_wrap(~ Condicion, scales = "free_y") +
+  labs(
+    title    = "Boxplots in Logarithmic Scale (Log10)",
+    subtitle = "Transformation applied across all conditions to improve comparability",
+    x        = "Session (Day)",
+    y        = "log10(MT\u2090\u1D65\u1D4D)"
+  ) +
+  boxplot_theme
+
+# -------------------------------------------------------------------------
+# 6. OVERWRITE long_data: apply log10 to MT for downstream LMM modeling
+# -------------------------------------------------------------------------
+
 long_data <- long_data %>%
   mutate(Value = if_else(Metric == "Movement Time (ms)", log10(Value), Value))
 
+cat("long_data updated: MT values are now log10-transformed.\n")
 
+# -------------------------------------------------------------------------
+# 7. FIGURE 7 — Distribution of TP (justification for no transformation)
+# -------------------------------------------------------------------------
 
-library(tidyverse)
-
-# --- 1. Gráfica para Throughput (TP) ---
-p_tp <- long_data %>%
-  filter(Metric == "Throughput (bps)") %>%
-  ggplot(aes(x = Value)) +
-  geom_histogram(aes(y = after_stat(density)), bins = 20, fill = "#404080", alpha = 0.5, color = "white") +
+ggplot(long_data %>% filter(Metric == "Throughput (bps)"),
+       aes(x = Value)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 20, fill = "#404080", alpha = 0.5, color = "white") +
   geom_density(linewidth = 1, color = "#404080") +
-  labs(title = "Throughput (TP) Distribution",
-       x = "Throughput (bits/s)", y = "Density") +
-  theme_minimal()
-
-# --- 2. Gráfica para Error Percentage (%) ---
-p_error <- long_data %>%
-  filter(Metric == "Error_pct") %>%
-  ggplot(aes(x = Value)) +
-  geom_histogram(aes(y = after_stat(density)), bins = 15, fill = "#f4a261", alpha = 0.5, color = "white") +
-  geom_density(linewidth = 1, color = "#f4a261") +
-  labs(title = "Distribución de la Tasa de Error",
-       subtitle = "Asimetría positiva: la mayoría de los ensayos tienen pocos errores",
-       x = "Porcentaje de Error (%)", y = "Densidad") +
-  theme_minimal()
-
-# --- 3. Gráfica para el Coeficiente de Ajuste (r) ---
-p_r <- long_data %>%
-  filter(Metric == "r_2d") %>%
-  ggplot(aes(x = Value)) +
-  geom_histogram(aes(y = after_stat(density)), bins = 15, fill = "#69b3a2", alpha = 0.5, color = "white") +
-  geom_density(linewidth = 1, color = "#69b3a2") +
-  labs(title = "Distribución del Coeficiente de Ajuste (r)",
-       subtitle = "Asimetría negativa: indica un excelente ajuste a la Ley de Fitts (> 0.9)",
-       x = "Valor de r", y = "Densidad") +
-  theme_minimal()
-
-
-# Para verlas, simplemente escribe el nombre de la que quieras en la consola:
-p_tp
-p_error
-p_r
+  labs(
+    title = "Throughput (TP) Distribution",
+    x     = "Throughput (bps)",
+    y     = "Density"
+  ) +
+  boxplot_theme
