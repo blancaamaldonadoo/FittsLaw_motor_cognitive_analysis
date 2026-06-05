@@ -1,25 +1,49 @@
-# 1. Load libraries (this enables the read_excel function and tidyverse suite)
+# =========================================================================
+# 00_quality_check.R
+# Purpose:  Load raw data and verify dataset integrity
+# Input:    DATOS_TFG.xlsx (sheet: "TODO")
+# Output:   datos, balance_control, missing_values_summary
+# =========================================================================
+
 library(readxl)
 library(tidyverse)
 
-# Load data from the specified path and sheet
-# Path: "Tablas_TFG_con_Fallos.xlsx"
-# Sheet: "TODO" (renamed to 'raw_data' or kept as 'datos' for logic)
-datos <- read_excel('/Users/blancamaldonado/Library/Mobile Documents/com~apple~CloudDocs/Blanca/Uni/4º Carrera/TFG/DATOS_TFG.xlsx', sheet="TODO", skip = 0)
+# -------------------------------------------------------------------------
+# 1. LOAD DATA
+# -------------------------------------------------------------------------
 
-# Check balance and experimental design completeness
+datos <- read_excel("DATOS_TFG.xlsx", sheet = "TODO")
+
+cat("Dataset loaded:", nrow(datos), "rows |", 
+    n_distinct(datos$Sujeto), "subjects |",
+    n_distinct(datos$Condicion), "conditions |",
+    n_distinct(datos$Dia), "days\n")
+
+# -------------------------------------------------------------------------
+# 2. BALANCE CHECK
+# Verifies every subject has one entry per day and condition
+# -------------------------------------------------------------------------
+
 balance_control <- datos %>%
-  # Group values by Subject, Day, and Condition, creating a new 'row_count' column
   count(Sujeto, Dia, Condicion, name = "row_count") %>%
-  
-  # Ensure every Subject has an entry for every Day and Condition; 
-  # if a combination is missing, assign 0 to row_count
   complete(Sujeto, Dia, Condicion, fill = list(row_count = 0))
 
-# Quantify missing values per variable
-# This summarizes how many empty (NA) values exist in each column of the dataset.
+# Flag any missing combinations
+missing_combinations <- balance_control %>% filter(row_count == 0)
+
+if (nrow(missing_combinations) == 0) {
+  cat("Balance check PASSED: no missing subject/day/condition combinations.\n")
+} else {
+  cat("WARNING: missing combinations detected:\n")
+  print(missing_combinations)
+}
+
+# -------------------------------------------------------------------------
+# 3. MISSING VALUES CHECK
+# -------------------------------------------------------------------------
+
 missing_values_summary <- datos %>%
-  # Reduce the dataset to a single summary row.
-  # across(everything()) applies the operation to all columns in the dataframe.
   summarise(across(everything(), ~sum(is.na(.x))))
 
+cat("\nMissing values per variable:\n")
+print(missing_values_summary)
