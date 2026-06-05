@@ -1,90 +1,102 @@
+# =========================================================================
+# 02_descriptives.R
+# Purpose:  Compute descriptive statistics for MT and TP
+# Input:    datos (from 00_quality_check.R)
+# Output:   long_data, descriptives, final_tfg_table
+#           Descriptive_Statistics_Table.docx
+# =========================================================================
+
 library(readxl)
 library(tidyverse)
 library(flextable)
 library(officer)
 
-# 1. Define Summary Function (Internal names in English)
-# Calculates Mean, SD, SE, and 95% Confidence Intervals
+# -------------------------------------------------------------------------
+# 1. HELPER FUNCTION
+# Computes mean, SD, SE, and 95% confidence intervals
+# -------------------------------------------------------------------------
+
 summary_mean_ci <- function(data, variable) {
   data %>%
     summarise(
-      n = n(),
-      mean = mean({{variable}}, na.rm = TRUE),
-      sd = sd({{variable}}, na.rm = TRUE),
-      se = sd / sqrt(n),
+      n        = n(),
+      mean     = mean({{variable}}, na.rm = TRUE),
+      sd       = sd({{variable}}, na.rm = TRUE),
+      se       = sd / sqrt(n),
       ci_lower = mean - (1.96 * se),
       ci_upper = mean + (1.96 * se)
     ) %>%
     ungroup()
 }
 
-# 2. Transform and TRANSLATE Content
-# Convert to long format and translate factor levels for international standards
+# -------------------------------------------------------------------------
+# 2. RESHAPE TO LONG FORMAT
+# Pivots MT and TP into a single Value column for grouped analysis
+# -------------------------------------------------------------------------
+
 long_data <- datos %>%
   pivot_longer(
-    cols = c(MTavg, TP_avg_2d), 
-    names_to = "Metric", 
+    cols      = c(MTavg, TP_avg_2d),
+    names_to  = "Metric",
     values_to = "Value"
   ) %>%
   mutate(
-    # Numerical format correction (handling commas as decimals if present)
+    # Numeric correction (handles commas as decimal separators if present)
     Value = as.numeric(gsub(",", ".", as.character(Value))),
-    
-    # Translate Metrics to formal Fitts' Law terminology
-    Metric = recode(Metric, 
-                    "MTavg" = "Movement Time (ms)", 
+
+    # Rename metrics to formal Fitts' Law terminology
+    Metric = recode(Metric,
+                    "MTavg"     = "Movement Time (ms)",
                     "TP_avg_2d" = "Throughput (bps)"),
-    
-    # Translate Experimental Conditions
+
+    # Rename conditions to English labels
     Condicion = recode(Condicion,
-                       "D" = "Dominant",
-                       "ND" = "Non-Dominant",
-                       "Carga D" = "Dominant + Load",
+                       "D"        = "Dominant",
+                       "ND"       = "Non-Dominant",
+                       "Carga D"  = "Dominant + Load",
                        "Carga ND" = "Non-Dominant + Load")
   )
 
-# 3. Calculate Descriptive Statistics
-# Grouped by Metric, Condition, and Day
+# -------------------------------------------------------------------------
+# 3. DESCRIPTIVE STATISTICS
+# Grouped by Metric, Condition, and Session Day
+# -------------------------------------------------------------------------
+
 descriptives <- long_data %>%
   group_by(Metric, Condicion, Dia) %>%
   summary_mean_ci(Value)
 
-# 4. Format Final Table with English Headers
-# Creates a publication-ready column "Mean ± SD"
+# -------------------------------------------------------------------------
+# 4. PUBLICATION-READY TABLE
+# Formats results as "Mean ± SD" for thesis reporting
+# -------------------------------------------------------------------------
+
 final_tfg_table <- descriptives %>%
-  mutate(Report = paste0(round(mean, 2), " ± ", round(sd, 2))) %>%
+  mutate(Report = paste0(round(mean, 2), " \u00b1 ", round(sd, 2))) %>%
   select(
-    Metric, 
-    Condition = Condicion, 
-    Day = Dia, 
-    n, 
+    Metric,
+    Condition = Condicion,
+    Day       = Dia,
+    n,
     `Mean ± SD` = Report
   )
 
-# Display results in console
 print(final_tfg_table)
 
-# --- Table Export for Word (APA-style formatting) ---
+# -------------------------------------------------------------------------
+# 5. EXPORT TO WORD (.docx)
+# -------------------------------------------------------------------------
 
-# Define border style (black, 1pt thickness)
-std_border = fp_border(color="black", width = 1)
+std_border <- fp_border(color = "black", width = 1)
 
-# Create the flextable with a boxed layout
 ft <- flextable(final_tfg_table) %>%
-  # 1. Apply boxed theme (standard borders)
   theme_box() %>%
-  # 2. Reinforce borders with custom style
   border_outer(border = std_border, part = "all") %>%
   border_inner(border = std_border, part = "all") %>%
-  # 3. Grey background for headers
   bg(bg = "#EFEFEF", part = "header") %>%
-  # 4. Bold header text
   bold(part = "header") %>%
-  # 5. Center-align all content
   align(align = "center", part = "all") %>%
-  # 6. Autofit to Word page width
   set_table_properties(layout = "autofit")
 
-# Save as a .docx file
 save_as_docx(ft, path = "Descriptive_Statistics_Table.docx")
-
+cat("Table exported: Descriptive_Statistics_Table.docx\n")
